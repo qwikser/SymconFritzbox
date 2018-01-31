@@ -1,7 +1,6 @@
 <?
 
 require_once(__dir__.'/../libs/fritzbox_api.class.php');
-
 class Fritzbox extends IPSModule
 {
         
@@ -28,13 +27,11 @@ class Fritzbox extends IPSModule
         $this->RegisterPropertyInteger("FBX_CALLLIST_CALLTYPE_11", false);
         $this->RegisterPropertyInteger("FBX_WIFI_GUEST_PASSPHRASE_LENGTH", 10);
         $this->RegisterPropertyString("FBX_DIAL_PORT", "");
-
         // Private properties
         $this->RegisterPropertyInteger("FBX_LASTPROCESSEDITEM", 0);
         $this->RegisterPropertyInteger("FBX_UPDATE_INTERVAL", 60000);
         $this->RegisterPropertyString("FBX_HOOKNAME", "FritzboxGetMessage"); 
         $this->RegisterPropertyString("FBX_REVERSE_CACHE", "[]");
-
         // Setting timers
         $this->RegisterTimer('timer_update', IPS_GetProperty($this->InstanceID, 'FBX_UPDATE_INTERVAL'), 'FBX_Update($_IPS[\'TARGET\']);');
     }
@@ -47,7 +44,6 @@ class Fritzbox extends IPSModule
         $sid = $this->RegisterScript("Hook", "Hook", "<? //Do not delete or modify.\ninclude(IPS_GetKernelDirEx().\"scripts/__ipsmodule.inc.php\");\ninclude(\"../modules/SymconFritzbox/Fritzbox/module.php\");\n(new Fritzbox(".$this->InstanceID."))->GetMessageAsBinary();");
         $this->RegisterHook("/hook/".IPS_GetProperty($this->InstanceID, "FBX_HOOKNAME"), $sid);
         IPS_SetHidden($sid, true);
-
         // Start create profiles
         $this->RegisterProfileBooleanEx("FBX.InternetState", "Internet", "", "", Array(  
                                                                                         Array(false, "Getrennt",  "", 0xFF0000),
@@ -58,7 +54,6 @@ class Fritzbox extends IPSModule
                                                                                         Array(false, "Aus",  "", 0xFF0000),
                                                                                         Array(true,  "Ein", "", 0x00FF00)
                                                                                       ));
-
         $this->RegisterProfileBooleanEx("FBX.Restart", "Power", "", "", Array(  
                                                                                         Array(false, "Nein",  "", 0xFF0000),
                                                                                         Array(true,  "Ja", "", 0x00FF00)
@@ -73,7 +68,6 @@ class Fritzbox extends IPSModule
         $callList_HTML = $this->RegisterVariableString("html_calllist", "Anrufliste");
         IPS_SetVariableCustomProfile($callList_HTML, "~HTMLBox");
         IPS_SetIcon($callList_HTML, "Telephone");
-
         $externalIP = $this->RegisterVariableString("externalip", "Externe IP-Adresse");
         IPS_SetIcon($externalIP, "Internet");
         
@@ -86,44 +80,43 @@ class Fritzbox extends IPSModule
         $statusInternetConnection = $this->RegisterVariableBoolean("status_internet_connection", "Internet Status");
         IPS_SetVariableCustomProfile($statusInternetConnection, "FBX.InternetState");
         SetValue($statusInternetConnection, false);
-
+		
         $missedCallsCounter = $this->RegisterVariableInteger("missed_calls_counter", "Anzahl verpasster Anrufe");
         SetValue($missedCallsCounter, 0);
-
+		
         $messageCounter = $this->RegisterVariableInteger("message_counter", "Anzahl neuer Nachrichten auf Anrufbeantworter");
         SetValue($messageCounter, 0);
-
+		
         $reconnect = $this->RegisterVariableBoolean("reconnect", "Internet erneut verbinden");
         IPS_SetVariableCustomProfile($reconnect, "FBX.Reconnect");
         $this->EnableAction("reconnect");
-
+		
         $restart = $this->RegisterVariableBoolean("restart", "Fritzbox Neutarten");
         IPS_SetVariableCustomProfile($restart, "FBX.Restart");
         $this->EnableAction("restart");
-
-        $wifiGuest = $this->RegisterVariableBoolean("wifi_guest", "WLAN: Gäste");
+		
+        $wifiGuest = $this->RegisterVariableBoolean("wifi_guest", "wifiNET: Gast");
         IPS_SetVariableCustomProfile($wifiGuest, "FBX.WLAN");
         $this->EnableAction("wifi_guest");
-        
-        $wifiGuest = $this->RegisterVariableBoolean("wifi_guest", "WLAN: Gäste");
-        IPS_SetVariableCustomProfile($wifiGuest, "FBX.WLAN");
-        $this->EnableAction("wifi_guest");
-        
+     
         $wifiGuestPassphrase = $this->RegisterVariableString("wifi_guest_passphrase", "WLAN: Gäste - WPA Schlüssel");
         IPS_SetIcon($wifiGuestPassphrase, "Key");
         IPS_SetHidden($wifiGuestPassphrase, true);
         
-        $wifiMain = $this->RegisterVariableBoolean("wifi_main", "WLAN: Intern");
-        IPS_SetVariableCustomProfile($wifiMain, "FBX.WLAN");
-        $this->EnableAction("wifi_main");
-        
+        $wifiMain2_4 = $this->RegisterVariableBoolean("wifi_main2_4", "wifiNET: 2.4GHz");
+        IPS_SetVariableCustomProfile($wifiMain2_4, "FBX.WLAN");
+        $this->EnableAction("wifi_main2_4");
+		
+        $wifiMain5 = $this->RegisterVariableBoolean("wifi_main5", "wifiNET: 5GHz");
+        IPS_SetVariableCustomProfile($wifiMain5, "FBX.WLAN");
+        $this->EnableAction("wifi_main5"); 
+		
         IPS_SetProperty($this->InstanceID, "FBX_REVERSE_CACHE", "[]"); // clear cache
         
         if(strlen(IPS_GetProperty($this->InstanceID, "FBX_IP")) > 0 && strlen(IPS_GetProperty($this->InstanceID, "FBX_USERNAME")) > 0 && strlen(IPS_GetProperty($this->InstanceID, "FBX_PASSWORD")) > 0) {
             $this->Update();
         }   
     }
-
     public function RequestAction($Ident, $Value) 
     { 
         if(strlen(trim(IPS_GetProperty($this->InstanceID, "FBX_USERNAME"))) == 0 || strlen(trim(IPS_GetProperty($this->InstanceID, "FBX_PASSWORD"))) == 0) 
@@ -131,15 +124,17 @@ class Fritzbox extends IPSModule
             $this->ModuleLogMessage("Fehler: Fritzbox Benutzername oder Passwort nicht gesetzt!");
             return false;
         }
-
         switch ($Ident) 
         { 
             case 'wifi_guest':
-                $this->SetWifiState(2, (int)$Value);
+                $this->SetWifiState(3, (int)$Value);
                 break;
-            case 'wifi_main':
+            case 'wifi_main2_4':
                 $this->SetWifiState(1, (int)$Value);
                 break;
+	    case 'wifi_main5':
+                $this->SetWifiState(2, (int)$Value);
+                break;	
             case 'reconnect':
                 $this->Reconnect();
                 break;
@@ -148,7 +143,6 @@ class Fritzbox extends IPSModule
                 break;
         } 
     }
-
     public function GetConfigurationForm() {
         if(strlen(trim(IPS_GetProperty($this->InstanceID, "FBX_USERNAME"))) > 0 || strlen(trim(IPS_GetProperty($this->InstanceID, "FBX_PASSWORD"))) > 0) {
             $client = new SoapClient(
@@ -215,27 +209,22 @@ class Fritzbox extends IPSModule
         }
         $elements .=    '] }';
         $elements .=    ']';
-
         $actions =      ',"actions":
                             [
                                 { "type": "Button", "label": "Restart Fritzbox", "onClick": "FBX_Restart($id);" }
                             ]
                         ';
-
         $configForm = "{";
         $configForm .= $elements;
         $configForm .= $actions;
         $configForm .= "}";
-
         return $configForm;
     }
-
     // PUBLIC ACCESSIBLE FUNCTIONS
     public function Test()
     {
         $this->Update();
     }
-
     public function Reconnect()
     {
         SetValue($this->GetIDForIdent("reconnect"), true);
@@ -244,7 +233,6 @@ class Fritzbox extends IPSModule
         sleep(2);
         SetValue($this->GetIDForIdent("reconnect"), false);
     }
-
     public function Restart()
     {
         SetValue($this->GetIDForIdent("restart"), true);
@@ -260,7 +248,6 @@ class Fritzbox extends IPSModule
             $this->ModuleLogMessage("Fehler: Fritzbox Benutzername oder Passwort nicht gesetzt!");
             return false;
         }
-
         $this->UpdateCallList();
         $this->UpdateConnectionInfos();
         $this->UpdateWifiInfos();
@@ -273,7 +260,6 @@ class Fritzbox extends IPSModule
             $this->ModuleLogMessage("Fehler: Fritzbox Benutzername oder Passwort nicht gesetzt!");
             return false;
         }
-
         if (isset($_GET['index']))
         {
             $client = new SoapClient(
@@ -290,7 +276,6 @@ class Fritzbox extends IPSModule
                 $client->DeleteMessage( new SoapParam((int)$_GET['tam'], 'NewIndex'),new SoapParam((int)$_GET['index'],'NewMessageIndex') );
             }
         }
-
         if (isset ($_GET['path']))
         {
             $client = new SoapClient(
@@ -315,7 +300,6 @@ class Fritzbox extends IPSModule
     public function DetailsForPhoneNumber($phoneNumber) {
         $searchResult = null;
         $cache = json_decode(IPS_GetProperty($this->InstanceID, "FBX_REVERSE_CACHE"), true);
-
         if(!array_key_exists($phoneNumber, $cache)) { // phonenumber not in cache
             switch (IPS_GetProperty($this->InstanceID, "FBX_CALLLIST_REVERSESEARCH")) {
                 case 'oertliche_de':
@@ -349,7 +333,6 @@ class Fritzbox extends IPSModule
             $this->ModuleLogMessage("Fehler: Fritzbox Benutzername oder Passwort nicht gesetzt!");
             return false;
         }
-
         $client = new SoapClient(
             null,
             array(
@@ -364,7 +347,6 @@ class Fritzbox extends IPSModule
         $client->SetEnable(new SoapParam($state, 'NewEnable'));
         $this->UpdateWifiInfos();
     }
-
     public function Dial($number) {
         if(strlen(trim(IPS_GetProperty($this->InstanceID, "FBX_USERNAME"))) == 0 || strlen(trim(IPS_GetProperty($this->InstanceID, "FBX_PASSWORD"))) == 0) 
         {
@@ -377,7 +359,6 @@ class Fritzbox extends IPSModule
             return false;
         }
         
-
         $client = new SoapClient(
             null,
             array(
@@ -388,27 +369,22 @@ class Fritzbox extends IPSModule
                 'password'  => IPS_GetProperty($this->InstanceID, "FBX_PASSWORD")
             )
         );
-
         $dialConfig = $client->{"X_AVM-DE_DialGetConfig"}();
         if($dialConfig == "unconfigured")
             $dialConfig = "";
-
         $client->{"X_AVM-DE_DialSetConfig"}(new SoapParam(IPS_GetProperty($this->InstanceID, 'FBX_DIAL_PORT'), 'NewX_AVM-DE_PhoneName'));
         sleep(0.5);
         $result = $client->{"X_AVM-DE_DialNumber"}(new SoapParam((string)$number, 'NewX_AVM-DE_PhoneNumber'));
         sleep(0.5);
         $client->{"X_AVM-DE_DialSetConfig"}(new SoapParam($dialConfig, 'NewX_AVM-DE_PhoneName'));
-
         return $result;
     }
-
     public function HangUp() {
         if(strlen(trim(IPS_GetProperty($this->InstanceID, "FBX_USERNAME"))) == 0 || strlen(trim(IPS_GetProperty($this->InstanceID, "FBX_PASSWORD"))) == 0) 
         {
             $this->ModuleLogMessage("Fehler: Fritzbox Benutzername oder Passwort nicht gesetzt!");
             return false;
         }
-
         $client = new SoapClient(
             null,
             array(
@@ -419,17 +395,14 @@ class Fritzbox extends IPSModule
                 'password'  => IPS_GetProperty($this->InstanceID, "FBX_PASSWORD")
             )
         );
-
         $dialConfig = $client->{"X_AVM-DE_DialGetConfig"}();
         if($dialConfig == "unconfigured")
             $dialConfig = "";
-
         $client->{"X_AVM-DE_DialSetConfig"}(new SoapParam(IPS_GetProperty($this->InstanceID, 'FBX_DIAL_PORT'), 'NewX_AVM-DE_PhoneName'));
         sleep(0.5);
         $result = $client->{"X_AVM-DE_DialHangup"}();
         sleep(0.5);
         $client->{"X_AVM-DE_DialSetConfig"}(new SoapParam($dialConfig, 'NewX_AVM-DE_PhoneName'));
-
         return $result;
     }
     
@@ -462,12 +435,10 @@ class Fritzbox extends IPSModule
         // return IPS_GetProperty($this->InstanceID, "FBX_AMOUNT_MISSED_CALLS");
         return GetValue($this->GetIDForIdent("missed_calls_counter"));
     }
-
     public function GetAmountOfMessages() {
         // return IPS_GetProperty($this->InstanceID, "FBX_AMOUNT_MESSAGES");
         return GetValue($this->GetIDForIdent("message_counter"));
     }
-
     // HELPER FUNCTIONS
     private function RegisterHook($Hook, $TargetID)
     {
@@ -505,7 +476,6 @@ class Fritzbox extends IPSModule
         IPS_SetVariableProfileValues($Name, $MinValue, $MaxValue, $StepSize);
         
     }
-
     protected function RegisterProfileIntegerEx($Name, $Icon, $Prefix, $Suffix, $Associations) {
         if ( sizeof($Associations) === 0 ){
             $MinValue = 0;
@@ -522,7 +492,6 @@ class Fritzbox extends IPSModule
         }
         
     }
-
     protected function RegisterProfileBoolean($Name, $Icon, $Prefix, $Suffix, $MinValue, $MaxValue, $StepSize) {
         if(!IPS_VariableProfileExists($Name)) {
             IPS_CreateVariableProfile($Name, 0);
@@ -553,7 +522,6 @@ class Fritzbox extends IPSModule
         }
         
     }
-
     protected function GetParent()
     {
         $instance = IPS_GetInstance($this->InstanceID);
@@ -563,7 +531,6 @@ class Fritzbox extends IPSModule
     protected function UpdateCallList() {
         $callList = $this->FB_GetCallList();
         $messageList = $this->FB_GetMessageList();
-
         
         
         for ($i=0; $i < count($callList); $i++) {
@@ -573,7 +540,6 @@ class Fritzbox extends IPSModule
                 $callList[$i]->Caller = (string)$callList[$i]->Called;
                 $callList[$i]->Called = $tmp;
             }
-
             // Clear own number for example ISDN: POTS: SIP: etc...
             $callList[$i]->Called = str_replace(strtoupper((string)$callList[$i]->Numbertype).": ","",(string)$callList[$i]->Called);
             $callList[$i]->addChild("AB"); // create empty message entry
@@ -600,7 +566,6 @@ class Fritzbox extends IPSModule
                 }
             }
         }
-
         $this->RenderCallList($callList);
     }
     
@@ -640,13 +605,27 @@ class Fritzbox extends IPSModule
         );
         
         $status = $client->GetInfo();
-        SetValue($this->GetIDForIdent("wifi_main"), (boolean)$status['NewEnable']);
-                
+        SetValue($this->GetIDForIdent("wifi_main2_4"), (boolean)$status['NewEnable']);
+ 
         $client = new SoapClient(
             null,
             array(
                 'location'	=> "http://".IPS_GetProperty($this->InstanceID, "FBX_IP").":49000/upnp/control/wlanconfig2",
                 'uri'		=> "urn:dslforum-org:service:WLANConfiguration:2",
+                'noroot' 	=> True,
+                'login'     => IPS_GetProperty($this->InstanceID, "FBX_USERNAME"),
+                'password'  => IPS_GetProperty($this->InstanceID, "FBX_PASSWORD")
+            )
+        );
+        
+        $status = $client->GetInfo();
+        SetValue($this->GetIDForIdent("wifi_main5"), (boolean)$status['NewEnable']);
+ 
+       $client = new SoapClient(
+            null,
+            array(
+                'location'	=> "http://".IPS_GetProperty($this->InstanceID, "FBX_IP").":49000/upnp/control/wlanconfig3",
+                'uri'		=> "urn:dslforum-org:service:WLANConfiguration:3",
                 'noroot' 	=> True,
                 'login'     => IPS_GetProperty($this->InstanceID, "FBX_USERNAME"),
                 'password'  => IPS_GetProperty($this->InstanceID, "FBX_PASSWORD")
@@ -674,7 +653,6 @@ class Fritzbox extends IPSModule
                  </script>";
                  
         // $HTML .= "<script src=\"https://raw.githubusercontent.com/goldfire/howler.js/2.0/howler.min.js\"></script>";
-
         if($callList != null) {    
             foreach ($callList as $call) {
                 $proceed = false;
@@ -785,7 +763,6 @@ class Fritzbox extends IPSModule
         
         // IPS_SetProperty($this->InstanceID, "FBX_AMOUNT_MESSAGES", $messageCounter);
         // IPS_SetProperty($this->InstanceID, "FBX_AMOUNT_MISSED_CALLS", $missedCallsCounter);
-
         SetValue($this->GetIDForIdent("missed_calls_counter"), $missedCallsCounter);
         SetValue($this->GetIDForIdent("message_counter"), $messageCounter);
         
@@ -825,8 +802,6 @@ class Fritzbox extends IPSModule
                         );
         return $record;
     }
-
-
     protected function QueryKlickTelDe($phoneNumber)
     {
         $url = 'http://www.klicktel.de/rueckwaertssuche/'.$phoneNumber;
@@ -940,7 +915,6 @@ class Fritzbox extends IPSModule
     protected function FB_GetConnectionInfos()
     {
         $return = array();
-
         $client = new SoapClient(
             null,
             array(
@@ -951,9 +925,7 @@ class Fritzbox extends IPSModule
                 'password'  => IPS_GetProperty($this->InstanceID, "FBX_PASSWORD")
             )
         );
-
         $return = array_merge($return, $client->GetCommonLinkProperties());
-
         $client = new SoapClient(
             null,
             array(
@@ -964,14 +936,11 @@ class Fritzbox extends IPSModule
                 'password'  => IPS_GetProperty($this->InstanceID, "FBX_PASSWORD")
             )
         );
-
         $return["ExternalIPAddress"] = $client->GetExternalIPAddress();
-
         // $return = array_merge($return, );
         
         return $return;
     }
-
     protected function FB_Reconnect()
     {
         $client = new SoapClient(
@@ -984,10 +953,8 @@ class Fritzbox extends IPSModule
                 'password'  => IPS_GetProperty($this->InstanceID, "FBX_PASSWORD")
             )
         );
-
         $client->ForceTermination();
     }
-
     protected function FB_Restart()
     {
         $client = new SoapClient(
@@ -1000,10 +967,8 @@ class Fritzbox extends IPSModule
                 'password'  => IPS_GetProperty($this->InstanceID, "FBX_PASSWORD")
             )
         );
-
         $client->Reboot();
     }
-
     protected function ModuleLogMessage($message) {
         IPS_LogMessage(IPS_GetObject($this->InstanceID)['ObjectName'], $message);
     }
